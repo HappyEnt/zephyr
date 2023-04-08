@@ -24,9 +24,10 @@ LOG_MODULE_REGISTER(dw1000, LOG_LEVEL_INF);
 
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
-
 #include <zephyr/net/ieee802154_radio.h>
 #include "ieee802154_dw1000_regs.h"
+
+#include <zephyr/drivers/ieee802154/dw1000.h>
 
 #define DT_DRV_COMPAT decawave_dw1000
 
@@ -1619,6 +1620,15 @@ static void dwt_iface_api_init(struct net_if *iface)
 
 	LOG_INF("Iface initialized");
 }
+
+
+/* Device Specific API */
+void dw1000_set_frame_filter(const struct device *dev, bool ff_enable) {
+	uint8_t fftype_default = DWT_SYS_CFG_FFAB | DWT_SYS_CFG_FFAD |
+			     DWT_SYS_CFG_FFAA | DWT_SYS_CFG_FFAM;
+	dwt_set_frame_filter(dev, ff_enable, fftype_default);
+}
+
 
 static struct ieee802154_radio_api dwt_radio_api = {
 	.iface_api.init		= dwt_iface_api_init,
