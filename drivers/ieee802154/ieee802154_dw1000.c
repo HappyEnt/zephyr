@@ -24,10 +24,11 @@ LOG_MODULE_REGISTER(dw1000, LOG_LEVEL_INF);
 
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/spi.h>
+#include <zephyr/drivers/ieee802154/dw1000.h>
 #include <zephyr/net/ieee802154_radio.h>
 #include "ieee802154_dw1000_regs.h"
 
-#include <zephyr/drivers/ieee802154/dw1000.h>
+
 
 #define DT_DRV_COMPAT decawave_dw1000
 
@@ -905,6 +906,37 @@ static void dwt_set_frame_filter(const struct device *dev,
 	dwt_reg_write_u8(dev, DWT_SYS_CFG_ID, 0, (uint8_t)sys_cfg_ff);
 }
 
+/* Device Specific API */
+void dw1000_set_frame_filter(const struct device *dev, bool ff_enable) {
+	uint8_t fftype_default = DWT_SYS_CFG_FFAB | DWT_SYS_CFG_FFAD |
+			     DWT_SYS_CFG_FFAA | DWT_SYS_CFG_FFAM;
+	dwt_set_frame_filter(dev, ff_enable, fftype_default);
+}
+
+static void dwt_enable_face_clock(const struct device*dev, bool enable) {
+	uint32_t old_reg = dwt_reg_read_u32(dev, DWT_PMSC_ID, DWT_PMSC_CTRL0_OFFSET);
+	dwt_reg_write_u32(dev, DWT_PMSC_ID, DWT_PMSC_CTRL0_OFFSET, enable ? old_reg | DWT_PMSC_CTRL0_FACE | DWT_PMSC_CTRL0_AMCE : old_reg & ~(DWT_PMSC_CTRL0_FACE | DWT_PMSC_CTRL0_AMCE) );
+}
+
+// NOTE we pass the buffer for the transfer through cir_mem since we need quite a large buffer
+// and we don't want to allocate it on the stack nor we want to allocate it statically here in the
+// driver since that would waste a lot of memory even if the user does not use this function.
+void dw1000_get_cir_acc_mem(const struct device *dev, uint8_t *cir_mem) {
+	// Force Accumulator Clock Enable
+	dwt_enable_face_clock(dev, true);
+
+	for(uint16_t i = 0; i < DWT_ACC_MEM_LEN; i++) {
+		// NOTE Irregardless of from which offset the acc memory is read, the first byte read is *always* some dummy value which we have to discard
+		// TODO read a longer continous block of data instead of reading byte by byte
+		uint8_t acc_reg[2];
+		dwt_register_read(dev, DWT_ACC_MEM_ID, i, sizeof(uint8_t) + 1, acc_reg);
+		cir_mem[i] = acc_reg[1];
+	}
+
+	dwt_enable_face_clock(dev, false);
+}
+
+
 static int dwt_configure(const struct device *dev,
 			 enum ieee802154_config_type type,
 			 const struct ieee802154_config *config)
@@ -1622,12 +1654,6 @@ static void dwt_iface_api_init(struct net_if *iface)
 }
 
 
-/* Device Specific API */
-void dw1000_set_frame_filter(const struct device *dev, bool ff_enable) {
-	uint8_t fftype_default = DWT_SYS_CFG_FFAB | DWT_SYS_CFG_FFAD |
-			     DWT_SYS_CFG_FFAA | DWT_SYS_CFG_FFAM;
-	dwt_set_frame_filter(dev, ff_enable, fftype_default);
-}
 
 
 static struct ieee802154_radio_api dwt_radio_api = {

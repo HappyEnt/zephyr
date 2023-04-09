@@ -105,9 +105,18 @@
  * Configure the frame filter.
  * @param dev The dw1000 device
  * @param ff_enable Enable or disable the frame filter
- * @param ff_type The type of frame filter to set
  */
 void dw1000_set_frame_filter(const struct device *dev, bool ff_enable);
+
+/**
+ * Retrieves the real and imaginary components of the Channel Impulse Response (CIR)
+ * from the DW1000 chip. Both cir_re and cire_im need at least enough space for 1016 elements!
+ *
+ * @param cir_re Pointer to an array where the real components of the CIR will be stored.
+ * @param cir_im Pointer to an array where the imaginary components of the CIR will be stored.
+ *               The ith element of cir_im corresponds to the ith element of cir_re.
+ */
+void dw1000_get_cir_acc_mem(const struct device *dev, uint8_t *cir_mem);
 
 /**
  * Read the carrier integrator value

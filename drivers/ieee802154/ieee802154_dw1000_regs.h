@@ -1775,6 +1775,7 @@
 #define DWT_PMSC_CTRL0_TXCLKS_OFF   0x00000030UL
 /* Force Accumulator Clock Enable */
 #define DWT_PMSC_CTRL0_FACE         0x00000040UL
+#define DWT_PMSC_CTRL0_AMCE         0x00008000UL
 /* GPIO clock enable */
 #define DWT_PMSC_CTRL0_GPCE         0x00010000UL
 /* GPIO reset (NOT), active low */
