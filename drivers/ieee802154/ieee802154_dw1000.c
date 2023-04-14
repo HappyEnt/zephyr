@@ -151,6 +151,7 @@ struct dwt_rx_info_regs {
 	uint8_t rx_time[DWT_RX_TIME_FP_RAWST_OFFSET];
 } _packed;
 
+
 static int dwt_configure_rf_phy(const struct device *dev);
 
 static int dwt_spi_read(const struct device *dev,
@@ -422,7 +423,7 @@ static inline void dwt_irq_handle_rx(const struct device *dev, uint32_t sys_stat
 		pkt_len -= DWT_FCS_LENGTH;
 	}
 
-	pkt = net_pkt_rx_alloc_with_buffer(ctx->iface, pkt_len,
+	pkt = net_pkt_rx_alloc_with_buffer(ctx->iface, pkt
 					   AF_UNSPEC, 0, K_NO_WAIT);
 	if (!pkt) {
 		LOG_ERR("No buf available");
@@ -936,6 +937,24 @@ void dw1000_get_cir_acc_mem(const struct device *dev, uint8_t *cir_mem) {
 	dwt_enable_face_clock(dev, false);
 }
 
+void dw1000_get_quality_indicators(const struct device *dev, struct dw1000_rx_quality_indicators *qi) {
+	struct dwt_rx_info_regs rx_inf_reg;
+	uint32_t rx_finfo;
+
+	dwt_register_read(dev, DWT_RX_FQUAL_ID, 0, sizeof(rx_inf_reg),
+			  (uint8_t *)&rx_inf_reg);
+
+	qi->fp_ampl1 = dwt_reg_read_u16(dev,
+		DWT_RX_TIME_ID, DWT_RX_TIME_FP_AMPL1_OFFSET);
+	qi->lde_std = sys_get_le16(&rx_inf_reg.rx_fqual[0]);
+	qi->fp_ampl2 = sys_get_le16(&rx_inf_reg.rx_fqual[2]);
+	qi->fp_ampl3 = sys_get_le16(&rx_inf_reg.rx_fqual[4]);
+	qi->cir_pwr = sys_get_le16(&rx_inf_reg.rx_fqual[6]);
+
+	// TODO its possible that this value needs to be adjusted see documentation of RX_FINFO register
+	// TODO currently this value is always fixed at 2052, check whats the supposed amount that should be transmitted.
+	qi->rx_pacc = dwt_reg_read_u32(dev, DWT_RX_FINFO_ID, DWT_RX_FINFO_OFFSET) & DWT_RX_FINFO_RXPACC_MASK >> DWT_RX_FINFO_RXPACC_SHIFT;
+}
 
 static int dwt_configure(const struct device *dev,
 			 enum ieee802154_config_type type,
@@ -1638,6 +1657,18 @@ static inline uint8_t *get_mac(const struct device *dev)
 	return dw1000->mac_addr;
 }
 
+uint64_t dw1000_get_fs_rx_ts(const struct device *dev) {
+	uint8_t ts_buf[sizeof(uint64_t)] = {0};
+	struct dwt_rx_info_regs rx_inf_reg;
+
+	dwt_register_read(dev, DWT_RX_FQUAL_ID, 0, sizeof(rx_inf_reg),
+			  (uint8_t *)&rx_inf_reg);
+
+	memcpy(ts_buf, &rx_inf_reg.rx_time, sizeof(rx_inf_reg.rx_time));
+
+	return sys_get_le64(ts_buf) * DWT_TS_TIME_UNITS_FS;
+}
+
 static void dwt_iface_api_init(struct net_if *iface)
 {
 	const struct device *dev = net_if_get_device(iface);
@@ -1652,8 +1683,6 @@ static void dwt_iface_api_init(struct net_if *iface)
 
 	LOG_INF("Iface initialized");
 }
-
-
 
 
 static struct ieee802154_radio_api dwt_radio_api = {

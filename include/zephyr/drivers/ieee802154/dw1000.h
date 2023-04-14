@@ -9,6 +9,21 @@
 
 #include <zephyr/device.h>
 
+
+// These structures are currently only for developing. We should later one think about proper interfaces
+// which can be used to expose this values. For instance the networking subsystems allows attaching
+// indicator values for the relative strength of the received package, i.e., we should try
+// to avoid such special interfaces as much as possible.
+struct dw1000_rx_quality_indicators {
+	uint16_t fp_ampl1;
+	uint16_t fp_ampl2;
+	uint16_t fp_ampl3;
+	uint16_t lde_std;
+	uint16_t cir_pwr;
+	/* uint8_t first_path; */
+	uint16_t rx_pacc;
+};
+
 /**
  * Set the upper 32 bits of the dw1000 timestamp
  * This method should be called just before the invocation of the tx method and from within the same
@@ -117,6 +132,10 @@ void dw1000_set_frame_filter(const struct device *dev, bool ff_enable);
  *               The ith element of cir_im corresponds to the ith element of cir_re.
  */
 void dw1000_get_cir_acc_mem(const struct device *dev, uint8_t *cir_mem);
+
+void dw1000_get_quality_indicators(const struct device *dev, struct dw1000_rx_quality_indicators *qi);
+
+uint64_t dw1000_get_fs_rx_ts(const struct device *dev);
 
 /**
  * Read the carrier integrator value
